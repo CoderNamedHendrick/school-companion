@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="School Companion learning and collaboration application.">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="School Companion">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>School Companion</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <script type="module">
+    // Load FlutterFire's browser SDK modules in a deterministic order before
+    // booting Flutter. Concurrent lazy imports can initialize Auth before its
+    // persistence adapters are ready, causing a valid stored user to be
+    // reported as signed out after a page reload.
+    window.firebase_core = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js');
+    window.firebase_auth = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js');
+    window.firebase_firestore = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js');
+    window.firebase_storage = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-storage.js');
+    window.firebase_messaging = await import('https://www.gstatic.com/firebasejs/12.18.0/firebase-messaging.js');
+
+    const startFlutter = () => {
+      const flutterBootstrap = document.createElement('script');
+      flutterBootstrap.src = 'flutter_bootstrap.js';
+      flutterBootstrap.async = true;
+      document.body.appendChild(flutterBootstrap);
+    };
+    if (document.readyState === 'complete') {
+      startFlutter();
+    } else {
+      window.addEventListener('load', startFlutter, {once: true});
+    }
+  </script>
+</body>
+</html>
