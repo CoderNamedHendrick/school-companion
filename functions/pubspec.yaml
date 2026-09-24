@@ -8,7 +8,7 @@ environment:
 dependencies:
   crypto: ^3.0.7
   firebase_admin_sdk: ^0.5.3
-  firebase_functions: ^0.6.0
+  firebase_functions: ^0.8.0
   google_cloud_firestore: ^0.5.5
   http: ^1.6.0
   shelf: ^1.4.2
