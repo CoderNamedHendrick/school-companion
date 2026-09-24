@@ -1,0 +1,4 @@
+School Companion integration evidence
+
+This text resource was uploaded through the Flutter client to the Firebase Storage
+emulator during the multi-user acceptance test on 23 August 2026.

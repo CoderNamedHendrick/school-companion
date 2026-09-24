@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "853755032440",
+    "project_id": "school-companion-project",
+    "storage_bucket": "school-companion-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:853755032440:android:1c8cd93ea12f4cbec14e8d",
+        "android_client_info": {
+          "package_name": "com.hendrick.school_companion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCU8G2J5iFPo9o-dajMGgiP4RTg-e7va7A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

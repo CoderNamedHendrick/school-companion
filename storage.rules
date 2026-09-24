@@ -1,0 +1,37 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function member(channelId) {
+      // Membership is resolved through the default Firestore database.
+      return signedIn() && firestore.get(
+        /databases/(default)/documents/channels/$(channelId)/memberships/$(request.auth.uid)
+      ).data.status == 'active';
+    }
+
+    match /resources/{channelId}/{userId}/{fileName} {
+      allow read: if member(channelId);
+      allow create: if resource == null && member(channelId)
+        && request.auth.uid == userId
+        && firestore.get(/databases/(default)/documents/_uploadReservations/$(fileName)).data.userId == userId
+        && firestore.get(/databases/(default)/documents/_uploadReservations/$(fileName)).data.channelId == channelId
+        && firestore.get(/databases/(default)/documents/_uploadReservations/$(fileName)).data.size == request.resource.size
+        && firestore.get(/databases/(default)/documents/_uploadReservations/$(fileName)).data.contentType == request.resource.contentType
+        && firestore.get(/databases/(default)/documents/_uploadReservations/$(fileName)).data.expiresAt > request.time
+        && request.resource.size > 0
+        && request.resource.size < 50 * 1024 * 1024
+        && request.resource.contentType.matches(
+          'application/pdf|audio/mpeg|audio/mp4|audio/wav|video/mp4|video/quicktime|text/plain'
+        );
+      allow delete: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

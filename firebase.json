@@ -1,0 +1,134 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "school-companion-project",
+          "appId": "1:853755032440:android:1c8cd93ea12f4cbec14e8d",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "school-companion-project",
+          "appId": "1:853755032440:ios:f68f128ff3e54885c14e8d",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "school-companion-project",
+          "appId": "1:853755032440:ios:f68f128ff3e54885c14e8d",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "school-companion-project",
+          "configurations": {
+            "android": "1:853755032440:android:1c8cd93ea12f4cbec14e8d",
+            "ios": "1:853755032440:ios:f68f128ff3e54885c14e8d",
+            "macos": "1:853755032440:ios:f68f128ff3e54885c14e8d",
+            "web": "1:853755032440:web:e4024d7ca1222daac14e8d",
+            "windows": "1:853755032440:web:908860557b4507f9c14e8d"
+          }
+        }
+      }
+    }
+  },
+  "functions": {
+    "source": "functions",
+    "ignore": [
+      ".dart_tool",
+      ".git",
+      "test",
+      "*.log",
+      ".env*"
+    ]
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true
+    }
+  },
+  "firestore": {
+    "indexes": "firestore.indexes.json",
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/auth-session",
+        "run": {
+          "serviceId": "auth-session",
+          "region": "europe-west1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(), microphone=(), geolocation=()"
+          },
+          {
+            "key": "Strict-Transport-Security",
+            "value": "max-age=31536000; includeSubDomains"
+          },
+          {
+            "key": "Content-Security-Policy",
+            "value": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+          }
+        ]
+      }
+    ]
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "storage": {
+      "port": 9199
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    },
+    "singleProjectMode": true
+  }
+}

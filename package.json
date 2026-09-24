@@ -1,0 +1,21 @@
+{
+  "name": "school-companion-emulator-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "bash tool/verify_all.sh",
+    "test:rules": "node --test test/firebase_rules.test.mjs",
+    "test:flutter-integration-emulator": "bash tool/run_android_integration.sh",
+    "test:emulator": "firebase emulators:exec --project demo-school-companion --only auth,firestore,storage 'npm run test:rules'",
+    "test:functions-emulator": "firebase emulators:exec --project school-companion-project --only auth,firestore,storage,functions 'npm run seed:emulator && node --test test/functions_emulator_smoke.test.mjs'",
+    "test:performance": "node test/performance_emulator.mjs",
+    "test:performance:emulator": "firebase emulators:exec --project school-companion-project --only auth,firestore,storage 'mkdir -p output/evidence && npm run seed:emulator && node test/performance_emulator.mjs > output/evidence/performance_results.json'",
+    "seed:emulator": "node tool/seed_emulator.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.2.1",
+    "firebase-admin": "^14.3.0",
+    "firebase-tools": "15.31.0"
+  }
+}

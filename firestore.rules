@@ -1,0 +1,298 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function validText(field, max) {
+      return request.resource.data[field] is string
+        && request.resource.data[field].size() > 0
+        && request.resource.data[field].size() <= max;
+    }
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function role() {
+      return profile().data.role;
+    }
+
+    function profileName() {
+      return profile().data.name;
+    }
+
+    function student() {
+      return signedIn() && role() == 'student';
+    }
+
+    function lecturer() {
+      return signedIn() && role() == 'lecturer';
+    }
+
+    function owner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function member(channelId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/channels/$(channelId)/memberships/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function lecturerMember(channelId) {
+      return lecturer() && member(channelId);
+    }
+
+    function validOwnProfile(userId) {
+      return request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'name', 'email', 'role', 'programme', 'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'student'
+        && request.resource.data.programme is string
+        && request.resource.data.programme.size() <= 160;
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if validOwnProfile(userId);
+      allow update: if owner(userId)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'programme', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.programme is string
+        && request.resource.data.programme.size() <= 160;
+
+      match /notifications/{notificationId} {
+        allow read: if owner(userId);
+        allow update: if owner(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          && request.resource.data.read is bool;
+        allow create: if lecturerMember(request.resource.data.channelId)
+          && exists(/databases/$(database)/documents/channels/$(request.resource.data.channelId)/memberships/$(userId))
+          && request.resource.data.recipientId == userId
+          && request.resource.data.title is string && request.resource.data.title.size() <= 200
+          && request.resource.data.body is string && request.resource.data.body.size() <= 4000;
+        allow delete: if owner(userId);
+      }
+
+      match /devices/{deviceId} {
+        allow read, delete: if owner(userId);
+        allow create, update: if owner(userId)
+          && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+          && request.resource.data.token is string
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.platform == 'flutter';
+      }
+    }
+
+    match /channels/{channelId} {
+      allow read: if member(channelId);
+      allow create, delete: if false;
+      allow update: if member(channelId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unread', 'updatedAt'])
+        && request.resource.data.unread == resource.data.unread + 1;
+
+      match /memberships/{membershipId} {
+        allow read: if owner(membershipId) || lecturerMember(channelId);
+        allow write: if false;
+      }
+
+      match /messages/{messageId} {
+        allow read: if member(channelId);
+        allow create: if request.resource.data.keys().hasOnly(['sender', 'senderId', 'body', 'isLecturer', 'timeLabel', 'createdAt'])
+        && member(channelId)
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.sender == profileName()
+          && request.resource.data.isLecturer == lecturer()
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 4000;
+        allow update, delete: if false;
+      }
+    }
+
+    // Supports collection-group membership discovery without exposing the
+    // membership roster to other users.
+    match /{path=**}/memberships/{membershipId} {
+      allow read: if signedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if member(resource.data.channelId);
+      allow create: if request.resource.data.keys().hasOnly(['channelId', 'authorId', 'author', 'title', 'body', 'pinned', 'publishedLabel', 'publishedAt'])
+        && lecturerMember(request.resource.data.channelId)
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.author == profileName()
+        && validText('title', 200) && validText('body', 4000);
+      allow update: if lecturerMember(resource.data.channelId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'body', 'pinned'])
+        && validText('title', 200) && validText('body', 4000);
+      allow delete: if lecturerMember(resource.data.channelId);
+    }
+
+    match /directMessages/{messageId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.participants;
+      allow create: if request.resource.data.keys().hasOnly(['sender', 'senderId', 'receiverId', 'participants', 'body', 'timeLabel', 'createdAt'])
+        && signedIn()
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.sender == profileName()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.receiverId in request.resource.data.participants
+        && request.resource.data.receiverId != request.auth.uid
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 4000
+        && request.resource.data.participants.size() == 2;
+      allow update, delete: if false;
+    }
+
+    match /resources/{resourceId} {
+      allow read: if member(resource.data.channelId);
+      allow create: if request.resource.data.keys().hasOnly(['title', 'kind', 'channelId', 'channel', 'updatedLabel', 'hasTranscript', 'storagePath', 'transcript', 'notes', 'uploaderId', 'updatedAt'])
+        && member(request.resource.data.channelId)
+        && request.resource.data.uploaderId == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.kind in ['pdf', 'audio', 'video', 'transcript']
+        && request.resource.data.storagePath is string
+        && (
+          request.resource.data.kind == 'transcript'
+          || request.resource.data.storagePath != ''
+        )
+        && (
+          request.resource.data.storagePath == ''
+          || request.resource.data.storagePath.matches(
+            '^resources/' + request.resource.data.channelId + '/'
+              + request.auth.uid + '/[^/]+$'
+          )
+        );
+      allow update: if false;
+      allow delete: if member(resource.data.channelId)
+        && (resource.data.uploaderId == request.auth.uid || lecturer());
+    }
+
+    match /meetings/{meetingId} {
+      allow read: if member(resource.data.channelId);
+      allow create: if request.resource.data.keys().hasOnly(['title', 'channelId', 'channel', 'timeLabel', 'duration', 'status', 'generateMeetLink', 'transcriptsEnabled', 'smartNotesEnabled', 'meetUrl', 'calendarEventId', 'organizerId', 'startsAt', 'endsAt', 'attendees', 'createdAt'])
+        && lecturerMember(request.resource.data.channelId)
+        && request.resource.data.organizerId == request.auth.uid
+        && validText('title', 200);
+      allow update: if lecturerMember(resource.data.channelId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'calendarEventId', 'meetUrl', 'workspaceMessage', 'updatedAt']);
+      allow delete: if lecturerMember(resource.data.channelId);
+    }
+
+    match /projectTasks/{taskId} {
+      allow read: if member(resource.data.channelId);
+      allow create: if request.resource.data.keys().hasOnly(['title', 'owner', 'stage', 'channelId', 'creatorId', 'comments', 'rank', 'createdAt'])
+        && member(request.resource.data.channelId)
+        && request.resource.data.creatorId == request.auth.uid
+        && validText('title', 200);
+      allow update: if member(resource.data.channelId)
+        && request.resource.data.channelId == resource.data.channelId
+        && request.resource.data.creatorId == resource.data.creatorId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stage', 'comments', 'updatedAt'])
+        && request.resource.data.stage in ['To do', 'In progress', 'Review', 'Done'];
+      allow delete: if lecturerMember(resource.data.channelId)
+        || (member(resource.data.channelId)
+          && resource.data.creatorId == request.auth.uid);
+
+      match /comments/{commentId} {
+        allow read: if member(
+          get(/databases/$(database)/documents/projectTasks/$(taskId)).data.channelId
+        );
+        allow create: if member(
+          get(/databases/$(database)/documents/projectTasks/$(taskId)).data.channelId
+        ) && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.author == profileName()
+          && validText('body', 4000);
+        allow update, delete: if false;
+      }
+    }
+
+    match /communityPosts/{postId} {
+      allow read: if lecturer()
+        || (student() && resource.data.moderationStatus == 'visible');
+      allow create: if request.resource.data.keys().hasOnly(['title', 'author', 'replies', 'tag', 'authorId', 'moderationStatus', 'createdAt'])
+        && student()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.author == profileName();
+      allow update: if (lecturer()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['moderationStatus', 'updatedAt'])
+          && request.resource.data.moderationStatus in ['visible', 'hidden'])
+        || (student()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['replies', 'updatedAt'])
+          && request.resource.data.replies == resource.data.replies + 1);
+      allow delete: if lecturer()
+        || (student() && resource.data.authorId == request.auth.uid);
+
+      match /replies/{replyId} {
+        allow read: if lecturer()
+          || (student()
+            && get(/databases/$(database)/documents/communityPosts/$(postId))
+              .data.moderationStatus == 'visible');
+        allow create: if student()
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.author == profileName()
+          && get(/databases/$(database)/documents/communityPosts/$(postId))
+            .data.moderationStatus == 'visible';
+        allow update: if student() && resource.data.authorId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body'])
+          && validText('body', 4000);
+        allow delete: if lecturer() || (student() && resource.data.authorId == request.auth.uid);
+      }
+    }
+
+    match /communityPolls/{pollId} {
+      allow read: if signedIn();
+      allow create: if request.resource.data.keys().hasOnly(['question', 'options', 'open', 'author', 'authorId', 'createdAt'])
+        && student()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.author == profileName()
+        && validText('question', 300)
+        && request.resource.data.options is map
+        && request.resource.data.options.size() >= 2
+        && request.resource.data.options.size() <= 10
+        && request.resource.data.options.values().hasOnly([0])
+        && request.resource.data.open == true;
+      allow update: if false;
+      match /votes/{userId} {
+        allow read: if owner(userId);
+        allow write: if false;
+      }
+      allow delete: if lecturer()
+        || (student() && resource.data.authorId == request.auth.uid);
+    }
+
+    match /assessments/{assessmentId} {
+      allow read: if member(resource.data.channelId);
+      allow create: if request.resource.data.keys().hasOnly(['title', 'channel', 'kind', 'questionCount', 'channelId', 'authorId', 'status', 'instructions', 'solution', 'createdAt'])
+        && lecturerMember(request.resource.data.channelId)
+        && request.resource.data.authorId == request.auth.uid
+        && validText('title', 200);
+      allow update: if lecturerMember(resource.data.channelId)
+        && request.resource.data.channelId == resource.data.channelId
+        && request.resource.data.authorId == resource.data.authorId
+        && validText('title', 200);
+      allow delete: if lecturerMember(resource.data.channelId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
