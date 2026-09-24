@@ -197,10 +197,10 @@ packages:
     dependency: "direct main"
     description:
       name: firebase_admin_sdk
-      sha256: b17f129ecb0ee2c0523f7441f6f40bfbc8ffcf9fb58fe9e4b0dbe1255969ba4d
+      sha256: b1ef0c20eda905c89a1634ccc19d9dbd7895f42ac60c0cf1de49b20003f168b8
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.3"
+    version: "0.5.6"
   firebase_functions:
     dependency: "direct main"
     description:
