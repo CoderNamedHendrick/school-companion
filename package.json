@@ -16,6 +16,6 @@
     "@firebase/rules-unit-testing": "^5.0.0",
     "firebase": "^12.2.1",
     "firebase-admin": "^14.3.0",
-    "firebase-tools": "15.31.0"
+    "firebase-tools": "15.34.0"
   }
 }
