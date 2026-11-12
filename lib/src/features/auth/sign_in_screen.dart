@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,6 +22,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _programme = TextEditingController();
   bool _creatingAccount = false;
   bool _busy = false;
+  bool _passwordVisible = false;
   String? _error;
 
   @override
@@ -70,8 +72,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _password,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password'),
+                  obscureText: !_passwordVisible,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    suffixIcon: IconButton(
+                      tooltip: _passwordVisible ? 'Hide password' : 'Show password',
+                      onPressed: () => setState(() => _passwordVisible = !_passwordVisible),
+                      icon: Icon(_passwordVisible ? Icons.visibility_off : Icons.visibility),
+                    ),
+                  ),
                 ),
                 if (_creatingAccount) ...[
                   const SizedBox(height: 12),
@@ -107,6 +118,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ? null
                       : () => setState(() {
                           _creatingAccount = !_creatingAccount;
+                          _passwordVisible = false;
                           _error = null;
                         }),
                   child: Text(_creatingAccount ? 'I already have an account' : 'Create student account'),
@@ -189,8 +201,26 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       await AuthSessionService.create(user);
       goTo(const MainShellRoute());
     } catch (error) {
+      debugPrint('Authentication flow failed: $error');
       if (mounted) {
-        setState(() => _error = 'Could not sign in. Check your details and try again.');
+        final message = switch (error) {
+          FirebaseAuthException(code: 'email-already-in-use') =>
+            'An account already exists for this email. Sign in instead.',
+          FirebaseAuthException(code: 'invalid-credential' || 'wrong-password' || 'user-not-found') =>
+            'The email address or password is incorrect.',
+          FirebaseAuthException(code: 'invalid-email') => 'Enter a valid email address.',
+          FirebaseAuthException(code: 'weak-password') => 'Choose a stronger password.',
+          FirebaseAuthException(code: 'too-many-requests') =>
+            'Too many attempts. Please wait before trying again.',
+          FirebaseAuthException(code: 'network-request-failed') =>
+            'Could not connect. Check your internet connection and try again.',
+          FirebaseException(plugin: 'firebase_app_check' || 'app-check') =>
+            'App verification failed. Reload the page and try again.',
+          _ => _creatingAccount
+              ? 'Could not finish creating your account. Please try again.'
+              : 'Could not complete sign-in. Please try again.',
+        };
+        setState(() => _error = message);
       }
     } finally {
       if (mounted) setState(() => _busy = false);

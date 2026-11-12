@@ -10,6 +10,18 @@ abstract final class AuthSessionService {
   static final Uri _endpoint = Uri.base.resolve('/api/auth-session');
 
   static Future<bool> restore(FirebaseAuth auth) async {
+    try {
+      return await _restore(auth).timeout(const Duration(seconds: 25));
+    } catch (error) {
+      // A failed session lookup must leave the user at sign-in, not prevent
+      // the application from rendering. Protected requests still require
+      // successful authentication and App Check verification.
+      debugPrint('Session restoration failed: $error');
+      return false;
+    }
+  }
+
+  static Future<bool> _restore(FirebaseAuth auth) async {
     if (!kIsWeb || FirebaseEnvironment.useEmulators) {
       return (await auth.authStateChanges().first)?.emailVerified == true;
     }
