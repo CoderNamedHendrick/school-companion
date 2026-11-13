@@ -10,36 +10,29 @@ import 'package:http/http.dart' as http;
 import 'package:school_companion_functions/workspace_api_gateway.dart';
 
 Future<void> main(List<String> args) async {
-  final gateway = WorkspaceApiGateway(
-    client: http.Client(),
-    config: WorkspaceConfig.fromEnvironment(),
-  );
+  final gateway = WorkspaceApiGateway(client: http.Client(), config: WorkspaceConfig.fromEnvironment());
 
+  // Keep deployed endpoint URLs stable across SDK name-normalization changes.
   await runFunctions((firebase) {
     firebase.https.onRequest(
-      name: 'scheduleGoogleWorkspaceMeeting',
+      name: 'schedule-google-workspace-meeting',
       // Secret parameters are registered at runtime as required by the SDK.
       // ignore: non_const_argument_for_const_parameter
       options: _workspaceOptions,
-      (request) async => _jsonEndpoint(
-        request,
-        isEmulator ? _emulateScheduleMeeting : gateway.scheduleMeeting,
-        action: 'meeting',
-      ),
+      (request) async =>
+          _jsonEndpoint(request, isEmulator ? _emulateScheduleMeeting : gateway.scheduleMeeting, action: 'meeting'),
     );
     firebase.https.onRequest(
-      name: 'configureGoogleMeetSpace',
+      name: 'configure-google-meet-space',
       // ignore: non_const_argument_for_const_parameter
       options: _workspaceOptions,
-      (request) async =>
-          _jsonEndpoint(request, gateway.configureMeetSpace, action: 'meeting'),
+      (request) async => _jsonEndpoint(request, gateway.configureMeetSpace, action: 'meeting'),
     );
     firebase.https.onRequest(
-      name: 'sendAnnouncementPush',
+      name: 'send-announcement-push',
       // ignore: non_const_argument_for_const_parameter
       options: _pushOptions,
-      (request) async =>
-          _jsonEndpoint(request, _sendAnnouncementPush, action: 'push'),
+      (request) async => _jsonEndpoint(request, _sendAnnouncementPush, action: 'push'),
     );
     firebase.https.onRequest(
       name: 'collaboration',
@@ -48,7 +41,7 @@ Future<void> main(List<String> args) async {
       (request) => _jsonEndpoint(request, null, action: 'collaboration'),
     );
     firebase.https.onRequest(
-      name: 'authSession',
+      name: 'auth-session',
       // ignore: non_const_argument_for_const_parameter
       options: _sessionOptions,
       _authSession,
@@ -68,29 +61,20 @@ Future<Response> _authSession(Request request) async {
     final auth = FirebaseApp.instance.auth();
     if (action == 'create') {
       final user = await requireUser(request);
-      requireRecentLogin(
-        user.authTime.millisecondsSinceEpoch ~/ 1000,
-        DateTime.now().toUtc(),
-      );
+      requireRecentLogin(user.authTime.millisecondsSinceEpoch ~/ 1000, DateTime.now().toUtc());
       await rateLimit(user.uid, 'sessionCreate');
       final sessionCookie = await auth.createSessionCookie(
         request.headers['authorization']!.substring(7),
         const SessionCookieOptions(expiresIn: 432000000),
       );
       return _jsonResponse(200, {'status': 'created'}).change(
-        headers: {
-          'set-cookie':
-              '__session=$sessionCookie; Max-Age=432000; Path=/; HttpOnly; Secure; SameSite=Strict',
-        },
+        headers: {'set-cookie': '__session=$sessionCookie; Max-Age=432000; Path=/; HttpOnly; Secure; SameSite=Strict'},
       );
     }
     if (action == 'restore') {
       final cookie = _cookie(request, '__session');
       if (cookie == null) throw const AccessDenied(401, 'Please sign in.');
-      final decoded = await auth.verifySessionCookie(
-        cookie,
-        checkRevoked: true,
-      );
+      final decoded = await auth.verifySessionCookie(cookie, checkRevoked: true);
       if (decoded.emailVerified != true) {
         throw const AccessDenied(403, 'Verify your email.');
       }
@@ -99,12 +83,9 @@ Future<Response> _authSession(Request request) async {
       return _jsonResponse(200, {'customToken': token});
     }
     if (action == 'clear') {
-      return _jsonResponse(200, {'status': 'cleared'}).change(
-        headers: {
-          'set-cookie':
-              '__session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict',
-        },
-      );
+      return _jsonResponse(200, {
+        'status': 'cleared',
+      }).change(headers: {'set-cookie': '__session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict'});
     }
     return _jsonResponse(400, {'error': 'Invalid session operation.'});
   } on AccessDenied catch (error) {
@@ -126,9 +107,7 @@ String? _cookie(Request request, String name) {
   return null;
 }
 
-Future<Map<String, Object?>> _emulateScheduleMeeting(
-  Map<String, Object?> body,
-) async {
+Future<Map<String, Object?>> _emulateScheduleMeeting(Map<String, Object?> body) async {
   MeetingRequest.fromJson(body);
   return {
     'status': 'emulated',
@@ -142,20 +121,14 @@ Future<Map<String, Object?>> _emulateScheduleMeeting(
 // The Dart Functions manifest builder derives the deployed secret name from
 // these identifiers, so they intentionally match Secret Manager exactly.
 // ignore: non_constant_identifier_names
-final GOOGLE_WORKSPACE_CLIENT_SECRET = defineSecret(
-  'GOOGLE_WORKSPACE_CLIENT_SECRET',
-);
+final GOOGLE_WORKSPACE_CLIENT_SECRET = defineSecret('GOOGLE_WORKSPACE_CLIENT_SECRET');
 // ignore: non_constant_identifier_names
-final GOOGLE_WORKSPACE_REFRESH_TOKEN = defineSecret(
-  'GOOGLE_WORKSPACE_REFRESH_TOKEN',
-);
+final GOOGLE_WORKSPACE_REFRESH_TOKEN = defineSecret('GOOGLE_WORKSPACE_REFRESH_TOKEN');
 
 final _workspaceOptions = HttpsOptions(
   region: Region(SupportedRegion.europeWest1),
   secrets: [GOOGLE_WORKSPACE_CLIENT_SECRET, GOOGLE_WORKSPACE_REFRESH_TOKEN],
-  serviceAccount: ServiceAccount(
-    'sc-workspace@school-companion-project.iam.gserviceaccount.com',
-  ),
+  serviceAccount: ServiceAccount('sc-workspace@school-companion-project.iam.gserviceaccount.com'),
   maxInstances: Instances(3),
   timeoutSeconds: TimeoutSeconds(60),
   cors: Cors(isEmulator ? ['*'] : productionOrigins.toList()),
@@ -163,9 +136,7 @@ final _workspaceOptions = HttpsOptions(
 
 final _pushOptions = HttpsOptions(
   region: Region(SupportedRegion.europeWest1),
-  serviceAccount: ServiceAccount(
-    'sc-push@school-companion-project.iam.gserviceaccount.com',
-  ),
+  serviceAccount: ServiceAccount('sc-push@school-companion-project.iam.gserviceaccount.com'),
   maxInstances: Instances(3),
   timeoutSeconds: TimeoutSeconds(60),
   cors: Cors(isEmulator ? ['*'] : productionOrigins.toList()),
@@ -173,9 +144,7 @@ final _pushOptions = HttpsOptions(
 
 final _collaborationOptions = HttpsOptions(
   region: Region(SupportedRegion.europeWest1),
-  serviceAccount: ServiceAccount(
-    'sc-collaboration@school-companion-project.iam.gserviceaccount.com',
-  ),
+  serviceAccount: ServiceAccount('sc-collaboration@school-companion-project.iam.gserviceaccount.com'),
   maxInstances: Instances(3),
   timeoutSeconds: TimeoutSeconds(60),
   cors: Cors(isEmulator ? ['*'] : productionOrigins.toList()),
@@ -183,9 +152,7 @@ final _collaborationOptions = HttpsOptions(
 
 final _sessionOptions = HttpsOptions(
   region: Region(SupportedRegion.europeWest1),
-  serviceAccount: ServiceAccount(
-    'sc-auth@school-companion-project.iam.gserviceaccount.com',
-  ),
+  serviceAccount: ServiceAccount('sc-auth@school-companion-project.iam.gserviceaccount.com'),
   maxInstances: Instances(3),
   timeoutSeconds: TimeoutSeconds(60),
   cors: Cors(isEmulator ? ['*'] : productionOrigins.toList()),
@@ -215,9 +182,7 @@ Future<Response> _jsonEndpoint(
   } on WorkspaceValidationException catch (_) {
     return _jsonResponse(400, {'error': 'Invalid request.'});
   } on WorkspaceConfigurationException catch (_) {
-    return _jsonResponse(503, {
-      'error': 'This service is temporarily unavailable.',
-    });
+    return _jsonResponse(503, {'error': 'This service is temporarily unavailable.'});
   } catch (_) {
     return _jsonResponse(500, {'error': 'The request could not be completed.'});
   }
@@ -233,11 +198,7 @@ Future<void> _validateAttendees(Map<String, Object?> body) async {
     if (email is! String || email.length > 254) {
       throw const AccessDenied(400, 'Invalid attendee.');
     }
-    final profiles = await db
-        .collection('users')
-        .where('email', WhereFilter.equal, email)
-        .limit(1)
-        .get();
+    final profiles = await db.collection('users').where('email', WhereFilter.equal, email).limit(1).get();
     if (profiles.docs.isEmpty) {
       throw const AccessDenied(403, 'Only channel members can be invited.');
     }
@@ -253,9 +214,7 @@ Future<void> _validateAttendees(Map<String, Object?> body) async {
   }
 }
 
-Future<Map<String, Object?>> _sendAnnouncementPush(
-  Map<String, Object?> body,
-) async {
+Future<Map<String, Object?>> _sendAnnouncementPush(Map<String, Object?> body) async {
   final request = PushNotificationRequest.fromJson(body);
   final app = FirebaseApp.instance;
   final memberships = await app
@@ -268,13 +227,7 @@ Future<Map<String, Object?>> _sendAnnouncementPush(
       .get();
   final tokens = <String>[];
   for (final membership in memberships.docs) {
-    final devices = await app
-        .firestore()
-        .collection('users')
-        .doc(membership.id)
-        .collection('devices')
-        .limit(5)
-        .get();
+    final devices = await app.firestore().collection('users').doc(membership.id).collection('devices').limit(5).get();
     for (final device in devices.docs) {
       final token = device.data()['token'];
       if (token is String && token.isNotEmpty) tokens.add(token);
@@ -284,11 +237,7 @@ Future<Map<String, Object?>> _sendAnnouncementPush(
     return {'status': 'no_registered_devices', 'successCount': 0};
   }
   if (isEmulator) {
-    return {
-      'status': 'emulated',
-      'registeredDeviceCount': tokens.length,
-      'successCount': tokens.length,
-    };
+    return {'status': 'emulated', 'registeredDeviceCount': tokens.length, 'successCount': tokens.length};
   }
   var successCount = 0;
   var failureCount = 0;

@@ -17,5 +17,8 @@
     "firebase": "^13.2.0",
     "firebase-admin": "^14.3.0",
     "firebase-tools": "15.35.0"
+  },
+  "engines": {
+    "node": ">=24.12.0"
   }
 }

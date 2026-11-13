@@ -12,8 +12,9 @@ Workspace and push notifications.
 ## Development
 
 Run commands from this directory. Install Flutter (with Dart 3.12.1 or later),
-Node.js, Firebase CLI, and JDK 21 for the Firebase emulators. Native builds also
-require the relevant Android or Apple toolchain.
+Node.js 24.12 or later (Node 24 LTS recommended), Firebase CLI, and JDK 21 for
+the Firebase emulators. Native builds also require the relevant Android or Apple
+toolchain.
 
 ```sh
 flutter pub get

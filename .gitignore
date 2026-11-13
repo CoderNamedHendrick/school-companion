@@ -56,6 +56,7 @@ app.*.map.json
 # Local verification artifacts
 .firebase/
 output/
+.nvmrc
 
 # Credentials and generated backend executables
 .env
