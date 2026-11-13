@@ -91,7 +91,7 @@ flutter build ipa --release --dart-define=USE_PRODUCTION_FIREBASE=true
 ### Web
 
 ```sh
-flutter build web --release \
+flutter build web --release --wasm \
   --dart-define=USE_PRODUCTION_FIREBASE=true \
   --dart-define=APP_CHECK_WEB_SITE_KEY=<registered-public-site-key> \
   --dart-define=FCM_WEB_VAPID_KEY=<public-vapid-key>
@@ -102,13 +102,25 @@ The registered public settings for this deployment are in
 in place of the individual flags above. Forks should register their own Firebase
 project and App Check providers.
 
+The web release uses WebAssembly with Flutter’s JavaScript fallback for browsers
+that do not support it.
+
 Serve `build/web` through the Firebase Hosting configuration in `firebase.json`
 to support persistent sign-in.
 
+Hosting sends `Cache-Control: max-age=0,s-maxage=604800` for the static web app.
+Browsers revalidate on reload, while Firebase caches files at the CDN and clears
+that cache on deployment. The `/api/**` routes use `no-store` for session data.
+Already-open pages need a reload to run a newly deployed release; responses
+cached under the old policy may need a one-time hard refresh.
+
 `tools/deploy_school_companion.sh` runs validation, builds the web release,
-and deploys Functions, access rules, indexes, and Hosting. It requires
-`APP_CHECK_WEB_SITE_KEY` and `SECURITY_MIGRATION_COMPLETE=1`; run it only after
-completing the migration below. Run the test suites with JDK 21 or later.
+and deploys Functions, access rules, indexes, and Hosting. It loads the public
+build settings from `config/production.json`;
+`APP_CHECK_WEB_SITE_KEY` can override the registered site key. Set
+`FIREBASE_ACCOUNT` when the deployment account differs from the CLI default.
+It requires `SECURITY_MIGRATION_COMPLETE=1`; run it only after completing the
+migration below. Run the test suites with JDK 21 or later.
 
 ## Release checks
 
@@ -138,7 +150,10 @@ per UTC day, and cannot overwrite an existing file. Files must be smaller than
 
 Before upgrading an existing deployment:
 
-1. Register the web app with reCAPTCHA Enterprise in Firebase App Check. Register
+1. Enable `firebaseappcheck.googleapis.com` and `recaptchaenterprise.googleapis.com`.
+   Ensure the Google-managed `service-<project-number>@gcp-sa-firebaseappcheck.iam.gserviceaccount.com`
+   account has `roles/firebaseappcheck.serviceAgent` on the Firebase project.
+   Register the web app with reCAPTCHA Enterprise in Firebase App Check. Register
    Play Integrity for Android and App Attest/Device Check for Apple clients before
    distributing those builds. Debug App Check tokens must never enter production.
 2. Configure dedicated runtime service accounts with only the required Firestore,
